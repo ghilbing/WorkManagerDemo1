@@ -26,16 +26,33 @@ class MainActivity : AppCompatActivity() {
         val data: Data = Data.Builder()
             .putInt(KEY_COUNT_VALUE, 125)
             .build()
+
         val constraints = Constraints.Builder()
             .setRequiresCharging(true)
             .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val filteringRequest = OneTimeWorkRequest.Builder(FilteringWorker::class.java)
+            .build()
+        val compressingRequest = OneTimeWorkRequest.Builder(CompressingWorker::class.java)
             .build()
         val uploadRequest = OneTimeWorkRequest.Builder(UploadWorker::class.java)
             .setConstraints(constraints)
             .setInputData(data)
             .build()
+        val downloadingRequest = OneTimeWorkRequest.Builder(DownloadingWorker::class.java)
+            .build()
 
-        workManager.enqueue(uploadRequest)
+        val parallelWorks = mutableListOf<OneTimeWorkRequest>()
+        parallelWorks.add(downloadingRequest)
+        parallelWorks.add(filteringRequest)
+
+        workManager
+            .beginWith(parallelWorks)
+            .then(compressingRequest)
+            .then(uploadRequest)
+            .enqueue()
+
         workManager.getWorkInfoByIdLiveData(uploadRequest.id).observe(this, Observer {
             textView.text = it.state.name
             if(it.state.isFinished){
